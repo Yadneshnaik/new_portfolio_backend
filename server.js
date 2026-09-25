@@ -7,27 +7,62 @@ dotenv.config();
 
 const app = express();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
+// ===============================
 // Middleware
+// ===============================
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "*",
+    methods: ["GET", "POST"],
   })
 );
 
 app.use(express.json());
 
-// Gmail transporter
+// ===============================
+// Check environment variables
+// ===============================
+
+console.log("GMAIL_USER:", process.env.GMAIL_USER ? "Loaded" : "Missing");
+
+console.log(
+  "GMAIL_APP_PASSWORD:",
+  process.env.GMAIL_APP_PASSWORD ? "Loaded" : "Missing"
+);
+
+// ===============================
+// Gmail Transporter
+// ===============================
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
+
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
 });
 
-// Test route
+// ===============================
+// Test Gmail connection
+// ===============================
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("Gmail connection error:");
+    console.error(error);
+  } else {
+    console.log("Gmail SMTP connection successful");
+  }
+});
+
+// ===============================
+// Home Route
+// ===============================
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -35,15 +70,26 @@ app.get("/", (req, res) => {
   });
 });
 
-// Contact form
+// ===============================
+// Contact API
+// ===============================
+
 app.post("/api/contact", async (req, res) => {
   try {
+    console.log("Contact request received");
+
     const {
       name,
       email,
       subject,
       message,
     } = req.body;
+
+    console.log("Form data received:", {
+      name,
+      email,
+      subject,
+    });
 
     // Validate fields
     if (!name || !email || !subject || !message) {
@@ -53,9 +99,10 @@ app.post("/api/contact", async (req, res) => {
       });
     }
 
-    // Email sent to you
+    // Email configuration
     const mailOptions = {
-      from: process.env.GMAIL_USER,
+      from: `"Portfolio Contact" <${process.env.GMAIL_USER}>`,
+
       to: process.env.GMAIL_USER,
 
       replyTo: email,
@@ -67,19 +114,26 @@ app.post("/api/contact", async (req, res) => {
           font-family: Arial, sans-serif;
           max-width: 650px;
           margin: auto;
+          background: #ffffff;
           border: 1px solid #ddd;
-          border-radius: 10px;
+          border-radius: 12px;
           overflow: hidden;
         ">
 
           <div style="
             background: #0d6efd;
             color: white;
-            padding: 20px;
+            padding: 25px;
           ">
+
             <h2 style="margin: 0;">
               New Portfolio Contact
             </h2>
+
+            <p style="margin-bottom: 0;">
+              Someone contacted you through your portfolio.
+            </p>
+
           </div>
 
           <div style="padding: 25px;">
@@ -99,7 +153,7 @@ app.post("/api/contact", async (req, res) => {
               ${subject}
             </p>
 
-            <hr />
+            <hr>
 
             <h3>Message</h3>
 
@@ -116,23 +170,37 @@ app.post("/api/contact", async (req, res) => {
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    console.log("Sending email...");
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log("Email sent:", info.messageId);
 
     res.status(200).json({
       success: true,
-      message: "Message sent successfully!",
+      message: "Your message has been sent successfully!",
     });
 
   } catch (error) {
-    console.error("Email error:", error);
+
+    console.error("=================================");
+    console.error("EMAIL ERROR");
+    console.error("=================================");
+
+    console.error(error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to send message.",
+      message: "Failed to send email.",
+      error: error.message,
     });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// ===============================
+// Start Server
+// ===============================
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
